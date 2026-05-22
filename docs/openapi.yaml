@@ -1,0 +1,13 @@
+openapi: 3.0.0
+info:
+  title: Mood Tracker API
+  version: 1.0.0
+paths:
+  /tasks:
+    get:
+      summary: Получить все задачи
+    post:
+      summary: Создать новую задачу
+  /stats/mood:
+    get:
+      summary: Получить статистику настроения
