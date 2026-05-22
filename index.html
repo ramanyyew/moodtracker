@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #F5F5F5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .task-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        .task-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            font-size: 14px;
+            color: #666;
+        }
+        .btn {
+            background: #6C63FF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 8px 0;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #DDD;
+            border-radius: 12px;
+            font-size: 16px;
+        }
+        .stats {
+            background: #6C63FF10;
+            padding: 16px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📋 Mood Tracker</h1>
+
+    <div class="stats" id="stats">
+        Загрузка статистики...
+    </div>
+
+    <div id="tasks-list">
+        Загрузка задач...
+    </div>
+
+    <div class="card">
+        <h3>➕ Новая задача</h3>
+        <div class="form-group">
+            <input type="text" id="task-title" placeholder="Что нужно сделать?">
+        </div>
+        <div class="form-group">
+            <select id="task-mood">
+                <option value="1">😢 Очень плохое (1)</option>
+                <option value="2">😐 Плохое (2)</option>
+                <option value="3">🙂 Нормальное (3)</option>
+                <option value="4">😊 Хорошее (4)</option>
+                <option value="5">🤩 Отличное (5)</option>
+            </select>
+        </div>
+        <button class="btn" onclick="createTask()">Создать задачу</button>
+    </div>
+</div>
+
+<script>
+    const API = 'http://localhost:8080';
+
+    async function loadTasks() {
+        const res = await fetch(`${API}/tasks`);
+        const tasks = await res.json();
+        const container = document.getElementById('tasks-list');
+        if (tasks.length === 0) {
+            container.innerHTML = '<div class="card">✨ Нет задач. Создайте первую!</div>';
+            return;
+        }
+        container.innerHTML = tasks.map(task => `
+            <div class="card">
+                <div class="task-title">${task.title}</div>
+                <div class="task-meta">
+                    <span>Настроение: ${'😊'.repeat(task.mood)}</span>
+                    <span>${task.done ? '✅ Выполнено' : '🟡 В процессе'}</span>
+                    <button onclick="toggleTask(${task.id})">✏️</button>
+                    <button onclick="deleteTask(${task.id})">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function createTask() {
+        const title = document.getElementById('task-title').value;
+        const mood = parseInt(document.getElementById('task-mood').value);
+        if (!title) return alert('Введите задачу');
+        await fetch(`${API}/tasks`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title, mood, done: false})
+        });
+        document.getElementById('task-title').value = '';
+        loadTasks();
+        loadStats();
+    }
+
+    async function deleteTask(id) {
+        if (!confirm('Удалить задачу?')) return;
+        await fetch(`${API}/tasks/${id}`, {method: 'DELETE'});
+        loadTasks();
+        loadStats();
+    }
+
+    async function toggleTask(id) {
+        const res = await fetch(`${API}/tasks`);
+        const tasks = await res.json();
+        const task = tasks.find(t => t.id === id);
+        if (task) {
+            await fetch(`${API}/tasks/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({...task, done: !task.done})
+            });
+            loadTasks();
+            loadStats();
+        }
+    }
+
+    async function loadStats() {
+        try {
+            const res = await fetch(`${API}/stats/mood`);
+            const stats = await res.json();
+            document.getElementById('stats').innerHTML = `
+                <h3>📊 Аналитика</h3>
+                <p>😊 Среднее настроение: ${stats.average_mood.toFixed(1)} / 5</p>
+                <p>📋 Всего задач: ${stats.total_tasks}</p>
+            `;
+        } catch (e) {
+            document.getElementById('stats').innerHTML = `
+                <h3>📊 Аналитика</h3>
+                <p>⚠️ Бэкенд не запущен. Запустите go run main.go</p>
+            `;
+        }
+    }
+
+    loadTasks();
+    loadStats();
+    setInterval(() => { loadStats(); }, 5000);
+</script>
+</body>
+</html>
